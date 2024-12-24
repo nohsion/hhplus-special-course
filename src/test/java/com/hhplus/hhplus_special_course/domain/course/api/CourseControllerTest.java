@@ -3,8 +3,10 @@ package com.hhplus.hhplus_special_course.domain.course.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hhplus.hhplus_special_course.domain.course.api.response.CourseEnrollmentResponse;
+import com.hhplus.hhplus_special_course.domain.course.api.response.CourseResponse;
 import com.hhplus.hhplus_special_course.domain.course.application.CourseFacade;
 import com.hhplus.hhplus_special_course.global.common.rest.ApiResponse;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -33,6 +35,7 @@ class CourseControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @DisplayName("특강 신청 목록 조회")
     @Test
     void getCourseEnrollments() throws Exception {
         // given
@@ -67,6 +70,38 @@ class CourseControllerTest {
 
     }
 
+    @DisplayName("특강 신청 가능 목록 조회")
+    @Test
+    void getAvailableCourses() throws Exception {
+        // given
+        List<CourseResponse> availableCourses = List.of(
+                getCourseResponse(1L),
+                getCourseResponse(2L),
+                getCourseResponse(3L)
+        );
+
+        when(courseFacade.getAvailableCourses())
+                .thenReturn(availableCourses);
+
+        // when
+        // then
+        String jsonResponse = mockMvc.perform(get("/api/v1/courses/available"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.result").value(ApiResponse.ResultCode.SUCCESS.name()))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        TypeReference<ApiResponse<List<CourseResponse>>> typeReference = new TypeReference<>() {
+        };
+        ApiResponse<List<CourseResponse>> actualApiResponse = objectMapper.readValue(jsonResponse, typeReference);
+
+        assertThat(actualApiResponse.getData())
+                .hasSize(3)
+                .usingRecursiveComparison().isEqualTo(availableCourses);
+    }
+
     private CourseEnrollmentResponse getCourseEnrollmentResponse(long courseEnrollmentId) {
         LocalDateTime mockEnrolledDate = LocalDateTime.of(2024, 12, 24, 12, 0, 0);
         return CourseEnrollmentResponse.builder()
@@ -79,6 +114,18 @@ class CourseControllerTest {
                 .enrolledStudents(5)
                 .courseDate(LocalDate.of(2024, 12, 25))
                 .createdAt(mockEnrolledDate)
+                .build();
+    }
+
+    private CourseResponse getCourseResponse(long courseId) {
+        return CourseResponse.builder()
+                .courseId(courseId)
+                .courseTitle("특강 제목")
+                .instructorId(1L)
+                .instructorName("강연자")
+                .maxStudents(30)
+                .enrolledStudents(5)
+                .courseDate(LocalDate.of(2024, 12, 25))
                 .build();
     }
 }
