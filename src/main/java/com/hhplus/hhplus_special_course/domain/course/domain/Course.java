@@ -43,4 +43,12 @@ public class Course {
 
     protected Course() {
     }
+
+    public boolean isInstructor(long userId) {
+        return this.instructorId == userId;
+    }
+
+    public boolean isFullCapacity(int currentStudents) {
+        return this.maxStudents <= currentStudents;
+    }
 }

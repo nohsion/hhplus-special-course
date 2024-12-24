@@ -6,7 +6,9 @@ import java.util.List;
 
 public interface CourseEnrollmentRepository {
 
-    List<UserCourseEnrollment> findByStudentId(final long userId);
+    List<UserCourseEnrollment> findByStudentId(long userId);
 
     int countByCourseId(long courseId);
+
+    UserCourseEnrollment save(UserCourseEnrollment userCourseEnrollment);
 }

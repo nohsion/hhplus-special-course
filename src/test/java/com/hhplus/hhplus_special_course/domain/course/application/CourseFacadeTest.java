@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.instancio.Select.field;
 import static org.mockito.Mockito.*;
 
@@ -169,5 +170,63 @@ class CourseFacadeTest {
         verify(courseService, times(1)).getAllCourses();
         verify(userService, times(3)).getUser(anyLong());
         verify(courseEnrollmentService, times(3)).getEnrolledStudentCount(anyLong());
+    }
+
+    @DisplayName("강연자는 자신의 특강을 신청하면 IllegalArgumentException 예외가 발생한다.")
+    @Test
+    void enrollCourseMyCourse() {
+        // given
+        long courseId = 1L;
+        long userId = 1L;
+        Course course = Instancio.of(Course.class)
+                .set(field(Course::getInstructorId), userId)
+                .create();
+        User user = Instancio.of(User.class)
+                .set(field(User::getId), userId)
+                .create();
+
+        when(courseService.getCourse(courseId))
+                .thenReturn(course);
+        when(userService.getUser(userId))
+                .thenReturn(user);
+
+        // when
+        // then
+        assertThatThrownBy(() -> sut.enrollCourse(courseId, userId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("강연자는 자신의 특강에 신청할 수 없습니다.");
+    }
+
+    @DisplayName("특강 신청 성공")
+    @Test
+    void enrollCourseSuccess() {
+        // given
+        long courseId = 1L;
+        long studentId = 2L;
+        Course course = Instancio.of(Course.class)
+                .set(field(Course::getInstructorId), 1L)
+                .create();
+        User user = Instancio.of(User.class)
+                .set(field(User::getId), studentId)
+                .create();
+        UserCourseEnrollment userCourseEnrollment = Instancio.of(UserCourseEnrollment.class)
+                .set(field(UserCourseEnrollment::getCourseId), courseId)
+                .set(field(UserCourseEnrollment::getStudentId), studentId)
+                .create();
+
+        when(courseService.getCourse(courseId))
+                .thenReturn(course);
+        when(userService.getUser(studentId))
+                .thenReturn(user);
+        when(courseEnrollmentService.enrollCourse(course, studentId))
+                .thenReturn(userCourseEnrollment);
+
+        // when
+        sut.enrollCourse(courseId, studentId);
+
+        // then
+        verify(courseService, times(1)).getCourse(courseId);
+        verify(userService, times(1)).getUser(studentId);
+        verify(courseEnrollmentService, times(1)).enrollCourse(course, studentId);
     }
 }

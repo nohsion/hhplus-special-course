@@ -1,5 +1,6 @@
 package com.hhplus.hhplus_special_course.domain.course.application;
 
+import com.hhplus.hhplus_special_course.domain.course.domain.Course;
 import com.hhplus.hhplus_special_course.domain.course.domain.UserCourseEnrollment;
 import com.hhplus.hhplus_special_course.domain.course.repository.CourseEnrollmentRepository;
 import org.springframework.stereotype.Service;
@@ -23,5 +24,15 @@ public class CourseEnrollmentService {
 
     public int getEnrolledStudentCount(final long courseId) {
         return courseEnrollmentRepository.countByCourseId(courseId);
+    }
+
+    public UserCourseEnrollment enrollCourse(final Course course, final long userId) {
+        int enrolledStudents = courseEnrollmentRepository.countByCourseId(course.getId());
+        if (course.isFullCapacity(enrolledStudents)) {
+            throw new IllegalStateException("정원이 초과되었습니다.");
+        }
+
+        UserCourseEnrollment userCourseEnrollment = UserCourseEnrollment.of(userId, course.getId());
+        return courseEnrollmentRepository.save(userCourseEnrollment);
     }
 }

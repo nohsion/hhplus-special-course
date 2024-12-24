@@ -7,6 +7,7 @@ import com.hhplus.hhplus_special_course.domain.course.domain.UserCourseEnrollmen
 import com.hhplus.hhplus_special_course.domain.course.api.response.CourseEnrollmentResponse;
 import com.hhplus.hhplus_special_course.domain.user.application.UserService;
 import com.hhplus.hhplus_special_course.domain.user.domain.User;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -14,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Component
 public class CourseFacade {
 
@@ -62,7 +64,7 @@ public class CourseFacade {
         return allCourses.stream()
                 .map(course -> {
                     int enrolledStudentCount = courseEnrollmentService.getEnrolledStudentCount(course.getId());
-                    if (course.getMaxStudents() <= enrolledStudentCount) {
+                    if (course.isFullCapacity(enrolledStudentCount)) {
                         return null;
                     }
                     User instructor = userService.getUser(course.getInstructorId());
@@ -74,5 +76,19 @@ public class CourseFacade {
                 })
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    public void enrollCourse(final long courseId, final long userId) {
+        Course course = courseService.getCourse(courseId);
+        User user = userService.getUser(userId);
+        if (course.isInstructor(user.getId())) {
+            throw new IllegalArgumentException("강연자는 자신의 특강에 신청할 수 없습니다.");
+        }
+
+        UserCourseEnrollment userCourseEnrollment = courseEnrollmentService.enrollCourse(course, userId);
+        log.debug("Enrolled courseId: {}, userId: {}, enrolledDateTime: {}",
+                userCourseEnrollment.getCourseId(),
+                userCourseEnrollment.getStudentId(),
+                userCourseEnrollment.getCreatedAt());
     }
 }

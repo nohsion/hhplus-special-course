@@ -5,10 +5,7 @@ import com.hhplus.hhplus_special_course.domain.course.api.response.CourseRespons
 import com.hhplus.hhplus_special_course.global.common.rest.ApiResponse;
 import com.hhplus.hhplus_special_course.domain.course.application.CourseFacade;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -43,6 +40,21 @@ public class CourseController {
         List<CourseResponse> availableCourses = courseFacade.getAvailableCourses();
 
         ApiResponse<List<CourseResponse>> response = ApiResponse.ofSuccess(availableCourses);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 특강 신청
+     */
+    @PostMapping("/{courseId}/enroll")
+    public ResponseEntity<ApiResponse<Void>> enrollCourse(
+            @PathVariable("courseId") final long courseId,
+            @RequestParam(value = "userId") final long userId
+    ) {
+        // todo: 강의별로 동시성 제어 필요 (선착순)
+        courseFacade.enrollCourse(courseId, userId);
+
+        ApiResponse<Void> response = ApiResponse.ofSuccess(null);
         return ResponseEntity.ok(response);
     }
 }

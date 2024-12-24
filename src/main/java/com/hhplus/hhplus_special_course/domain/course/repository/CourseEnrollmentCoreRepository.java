@@ -26,4 +26,9 @@ public class CourseEnrollmentCoreRepository implements CourseEnrollmentRepositor
         return courseEnrollmentJpaRepository.countByCourseId(courseId);
     }
 
+    @Override
+    public UserCourseEnrollment save(final UserCourseEnrollment userCourseEnrollment) {
+        return courseEnrollmentJpaRepository.save(userCourseEnrollment);
+    }
+
 }

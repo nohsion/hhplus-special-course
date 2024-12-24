@@ -28,4 +28,13 @@ public class UserCourseEnrollment {
 
     protected UserCourseEnrollment() {
     }
+
+    private UserCourseEnrollment(final long studentId, final long courseId) {
+        this.studentId = studentId;
+        this.courseId = courseId;
+    }
+
+    public static UserCourseEnrollment of(final long studentId, final long courseId) {
+        return new UserCourseEnrollment(studentId, courseId);
+    }
 }
