@@ -1,6 +1,7 @@
 package com.hhplus.hhplus_special_course.domain.course.application;
 
 import com.hhplus.hhplus_special_course.domain.course.api.converter.CourseResponseConverter;
+import com.hhplus.hhplus_special_course.domain.course.api.response.CourseResponse;
 import com.hhplus.hhplus_special_course.domain.course.domain.Course;
 import com.hhplus.hhplus_special_course.domain.course.domain.UserCourseEnrollment;
 import com.hhplus.hhplus_special_course.domain.course.api.response.CourseEnrollmentResponse;
@@ -11,6 +12,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 @Component
 public class CourseFacade {
@@ -49,6 +51,28 @@ public class CourseFacade {
                             enrolledStudentCount
                     );
                 })
+                .toList();
+    }
+
+    public List<CourseResponse> getAvailableCourses() {
+        List<Course> allCourses = courseService.getAllCourses();
+        if (CollectionUtils.isEmpty(allCourses)) {
+            return Collections.emptyList();
+        }
+        return allCourses.stream()
+                .map(course -> {
+                    int enrolledStudentCount = courseEnrollmentService.getEnrolledStudentCount(course.getId());
+                    if (course.getMaxStudents() <= enrolledStudentCount) {
+                        return null;
+                    }
+                    User instructor = userService.getUser(course.getInstructorId());
+                    return CourseResponseConverter.from(
+                            course,
+                            instructor,
+                            enrolledStudentCount
+                    );
+                })
+                .filter(Objects::nonNull)
                 .toList();
     }
 }

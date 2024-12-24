@@ -1,6 +1,7 @@
 package com.hhplus.hhplus_special_course.domain.course.application;
 
 import com.hhplus.hhplus_special_course.domain.course.api.response.CourseEnrollmentResponse;
+import com.hhplus.hhplus_special_course.domain.course.api.response.CourseResponse;
 import com.hhplus.hhplus_special_course.domain.course.domain.Course;
 import com.hhplus.hhplus_special_course.domain.course.domain.UserCourseEnrollment;
 import com.hhplus.hhplus_special_course.domain.user.application.UserService;
@@ -84,6 +85,88 @@ class CourseFacadeTest {
 
         verify(courseEnrollmentService, times(1)).getCourseEnrollmentsByUserId(userId);
         verify(courseService, times(3)).getCourse(anyLong());
+        verify(userService, times(3)).getUser(anyLong());
+        verify(courseEnrollmentService, times(3)).getEnrolledStudentCount(anyLong());
+    }
+
+    @DisplayName("특강 신청 가능 목록이 없으면 빈 리스트를 반환한다.")
+    @Test
+    void getAvailableCoursesEmptyList() {
+        // given
+        when(courseService.getAllCourses())
+                .thenReturn(Collections.emptyList());
+
+        // when
+        List<CourseEnrollmentResponse> result = sut.getCourseEnrollmentsByUserId(1L);
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @DisplayName("정원이 가득찬 특강 신청 가능 목록은 제외하고 반환한다.")
+    @Test
+    void getAvailableCoursesFullCapacity() {
+        // given
+        int maxStudents = 30;
+        int enrolledStudents = 30;
+        List<Course> courses = Instancio.ofList(Course.class)
+                .size(3)
+                .set(field(Course::getMaxStudents), maxStudents)
+                .create();
+        List<User> instructors = courses.stream()
+                .map(course -> Instancio.of(User.class)
+                        .set(field(User::getId), course.getInstructorId())
+                        .create())
+                .toList();
+
+        when(courseService.getAllCourses())
+                .thenReturn(courses);
+        for (int i = 0; i < courses.size(); i++) {
+            when(userService.getUser(courses.get(i).getInstructorId()))
+                    .thenReturn(instructors.get(i));
+            when(courseEnrollmentService.getEnrolledStudentCount(courses.get(i).getId()))
+                    .thenReturn(enrolledStudents);
+        }
+
+        // when
+        List<CourseResponse> result = sut.getAvailableCourses();
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @DisplayName("정원이 가득차지 않은 특강 신청 가능 목록을 반환한다.")
+    @Test
+    void getAvailableCourses() {
+        // given
+        int maxStudents = 30;
+        int enrolledStudents = 10;
+        List<Course> courses = Instancio.ofList(Course.class)
+                .size(3)
+                .set(field(Course::getMaxStudents), maxStudents)
+                .create();
+        List<User> instructors = courses.stream()
+                .map(course -> Instancio.of(User.class)
+                        .set(field(User::getId), course.getInstructorId())
+                        .create())
+                .toList();
+
+        when(courseService.getAllCourses())
+                .thenReturn(courses);
+        for (int i = 0; i < courses.size(); i++) {
+            when(userService.getUser(courses.get(i).getInstructorId()))
+                    .thenReturn(instructors.get(i));
+            when(courseEnrollmentService.getEnrolledStudentCount(courses.get(i).getId()))
+                    .thenReturn(enrolledStudents);
+        }
+
+        // when
+        List<CourseResponse> result = sut.getAvailableCourses();
+
+        // then
+        assertThat(result).hasSize(3);
+
+        verify(courseService, times(1)).getAllCourses();
         verify(userService, times(3)).getUser(anyLong());
         verify(courseEnrollmentService, times(3)).getEnrolledStudentCount(anyLong());
     }
