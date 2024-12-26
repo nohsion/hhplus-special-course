@@ -2,6 +2,7 @@ package com.hhplus.hhplus_special_course.domain.course.application;
 
 import com.hhplus.hhplus_special_course.domain.course.domain.Course;
 import com.hhplus.hhplus_special_course.domain.course.exception.CourseFullCapacityException;
+import com.hhplus.hhplus_special_course.global.common.lock.DistributedLockException;
 import com.hhplus.hhplus_special_course.test.TestDataCleaner;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,11 +69,53 @@ class CourseEnrollmentServiceConcurrencyTest {
         latch.await();
         executorService.shutdown();
 
-        int current = courseEnrollmentService.getEnrolledStudentCount(courseId);
-        System.out.println("current = " + current);
-
         // then
         assertThat(successCount.get()).isEqualTo(30);
         assertThat(failCount.get()).isEqualTo(10);
+
+        int current = courseEnrollmentService.getEnrolledStudentCount(courseId);
+        assertThat(current).isEqualTo(30);
+    }
+
+    @DisplayName("동일한 유저가 동일한 특강을 동시에 5번 신청했을 때, 1번만 성공하고 나머지는 실패해야 한다.")
+    @Test
+    void enrollSameUserSameCourseConcurrently() throws Exception {
+        // given
+        long courseId = 1L;
+        long userId = 1L;
+        int maxStudents = 30;
+        Course course = Instancio.of(Course.class)
+                .set(field(Course::getId), courseId)
+                .set(field(Course::getMaxStudents), maxStudents)
+                .create();
+
+        final int numOfExecute = 5;
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
+        CountDownLatch latch = new CountDownLatch(numOfExecute);
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failCount = new AtomicInteger(0);
+
+        // when
+        for (int i = 0; i < numOfExecute; i++) {
+            executorService.submit(() -> {
+                try {
+                    courseEnrollmentService.enrollCourse(course, userId);
+                    successCount.incrementAndGet();
+                } catch (DistributedLockException e) { // 중복 신청시 실패 (unique 제약조건)
+                    failCount.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+        latch.await();
+        executorService.shutdown();
+
+        // then
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(failCount.get()).isEqualTo(4);
+
+        int current = courseEnrollmentService.getEnrolledStudentCount(courseId);
+        assertThat(current).isEqualTo(1);
     }
 }
