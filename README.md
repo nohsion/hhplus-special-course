@@ -84,7 +84,53 @@ RDBMS는 MariaDB를 Docker로 띄워 사용합니다.
 | 정원    | max_students      | 특강의 최대 수강 인원                              |
 | 특강 날짜 | course date       | 특강이 열리는 날짜 (`yyyy-mm-dd`) e.g. 2024-12-25 |
 
+# 4. 분산서버 동시성 제어 방식
+
+## 4-1. JPA lock
+
+### 낙관적 락 (Optimistic Lock)
+
+- 버전(`@Version`) 관리로 동시성을 제어하는데, 업데이트 시 버전이 다르면(버전 충돌) `OptimisticLockException`이 발생합니다.
+- 따라서, 재시도 로직을 애플리케이션 레벨에서 구현해야 합니다.
+  - ex: "최대 100번까지 재시도 하되, delay를 10ms씩 주기"
+- 최초 요청 순서가 아닌 retry 타이밍에 따라 결정됩니다. (순서 보장 X)
+
+**결론**: Retry 로직을 추가하여 동시성 제어가 가능하긴 하지만, 충돌 가능성이 높은 선착순 서비스에는 적합하지 않다고 판단했습니다. (오히려, 트랜잭션 작업이 오래 걸린다면 유리하다고 생각합니다.)
+
+### 비관적 락 (Pessimistic Lock)
+
+- `select for update` 쿼리문을 통해서 DB의 특정 레코드를 잠금 처리하는 방식입니다.
+- 종류
+  - `LockModeType.PESSIMISTIC_READ`(읽기 잠금, 공유락): 사용 불가
+    - 이유: "특강 잔여 수 체크 -> 특강 신청"을 하기 때문에, 중간에 다른 사람이 읽어간다면 문제가 발생할 수 있습니다.
+    - ex: 특강 잔여 수가 1개 남았는데, 동시에 2명이 신청하면 둘다 잔여 수는 1로 read해갔기 때문에 인원 수를 초과하게 됩니다.
+  - `LockModeType.PESSIMISTIC_WRITE`(쓰기 잠금, 배타락): 사용 가능
+    - 이유: 특강 신청 중에 다른 사람이 잔여 수를 확인해서 업데이트한다면 정원을 초과할 수 있기 때문에, 배타적 잠금으로 해결하여야 합니다.
+
+결론: 선착순 서비스에 `PESSIMISTIC_WRITE`가 적합하다고 판단했습니다.
+
+## 4-2. User-level Lock (Named Lock)
+
+- MySQL(MariaDB)에서 제공하는 `GET_LOCK(str, timeout)`, `RELEASE_LOCK(str)` 함수를 사용하여 이름을 통한 lock 획득, 해제를 통해 동시성을 제어합니다.
+- DB 레코드나 테이블 level이 아닌, 사용자가 지정한 문자열 이름을 통해 lock을 관리합니다.
+- 
+
+### 고려사항
+- 많은 스레드가 Lock 요청을 시도한다면, DB 커넥션 풀의 대부분의 커넥션을 사용할 수 있습니다. 따라서 Named Lock만을 위한 별도의 커넥션 풀을 사용하는 것이 좋을 것 같습니다.
+- 동시에 Lock 획득 대기 시, 순서를 보장하지 않습니다.
+
+## 비관적 락이 아닌 Named Lock을 채택한 이유
+
+1. 비관적 락을 사용할 경우, 단순히 특강 잔여 수를 조회할 때도 레코드 단에 Lock이 걸려있어서 대기해야 하는 문제가 있다고 판단했습니다.
+2. 비관적 락은 특강 신청자 수(잔여 수) 컬럼을 추가하는 반정규화를 해야 하기 때문에, 데이터 무결성이 깨질 수 있다고 판단했습니다.
+   - 질문: 테스트가 보장되었다는 전제 하에, 동시성 제어를 했으니 매핑테이블의 row수와 컬럼 값이 매번 일치한다고 가정하는 건가요? 혹시 사람이 실수로 DB를 건드릴 수도 있지 않을까 생각이 들어서요.
+3. 애플리케이션 레벨에서 세밀하게 Lock을 제어할 수 있다고 판단했습니다.
+
+
 # 참고
 
 - https://dkswnkk.tistory.com/697
 - https://cheese10yun.github.io/spring-guide-directory/
+- https://techblog.woowahan.com/2631/
+- https://tecoble.techcourse.co.kr/post/2023-08-16-concurrency-managing/
+- https://ksh-coding.tistory.com/125
